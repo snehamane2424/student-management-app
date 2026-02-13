@@ -6,17 +6,18 @@ on:
       - main
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-  ECS_CLUSTER: ${{ secrets.ECS_CLUSTER }}
-  ECS_SERVICE: ${{ secrets.ECS_SERVICE }}
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: student-app
+  ECS_CLUSTER: student-cluster
+  ECS_SERVICE: student-task-service-4y55j4yg
+  ACCOUNT_ID: 442426862551
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Checkout source
       uses: actions/checkout@v3
 
     - name: Configure AWS credentials
@@ -27,16 +28,22 @@ jobs:
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build, tag, and push image
       run: |
-        docker build -t $ECR_REPOSITORY .
-        docker tag $ECR_REPOSITORY:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:latest
-        docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:latest
+        aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-    - name: Force new ECS deployment
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY:v1 .
+
+    - name: Tag Docker image
+      run: |
+        docker tag $ECR_REPOSITORY:v1 $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:v1
+
+    - name: Push Docker image
+      run: |
+        docker push $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:v1
+
+    - name: Force ECS new deployment
       run: |
         aws ecs update-service \
           --cluster $ECS_CLUSTER \
